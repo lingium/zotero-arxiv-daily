@@ -8,6 +8,14 @@ from loguru import logger
 import json
 RawPaperItem = TypeVar('RawPaperItem')
 
+
+def _normalize_generation_kwargs(llm_params: dict) -> dict:
+    generation_kwargs = dict(llm_params.get('generation_kwargs', {}))
+    model = generation_kwargs.get('model', '')
+    if model.startswith('gpt-5') and 'max_tokens' in generation_kwargs and 'max_completion_tokens' not in generation_kwargs:
+        generation_kwargs['max_completion_tokens'] = generation_kwargs.pop('max_tokens')
+    return generation_kwargs
+
 @dataclass
 class Paper:
     source: str
@@ -42,6 +50,7 @@ class Paper:
         prompt_tokens = enc.encode(prompt)
         prompt_tokens = prompt_tokens[:4000]  # truncate to 4000 tokens
         prompt = enc.decode(prompt_tokens)
+        generation_kwargs = _normalize_generation_kwargs(llm_params)
         
         response = openai_client.chat.completions.create(
             messages=[
@@ -51,7 +60,7 @@ class Paper:
                 },
                 {"role": "user", "content": prompt},
             ],
-            **llm_params.get('generation_kwargs', {})
+            **generation_kwargs
         )
         tldr = response.choices[0].message.content
         return tldr
@@ -75,6 +84,7 @@ class Paper:
             prompt_tokens = enc.encode(prompt)
             prompt_tokens = prompt_tokens[:2000]  # truncate to 2000 tokens
             prompt = enc.decode(prompt_tokens)
+            generation_kwargs = _normalize_generation_kwargs(llm_params)
             affiliations = openai_client.chat.completions.create(
                 messages=[
                     {
@@ -83,7 +93,7 @@ class Paper:
                     },
                     {"role": "user", "content": prompt},
                 ],
-                **llm_params.get('generation_kwargs', {})
+                **generation_kwargs
             )
             affiliations = affiliations.choices[0].message.content
 
